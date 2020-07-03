@@ -11,25 +11,47 @@ function fail($sError, $sUserError = false)
 
 function getProcessorCount()
 {
-    $sCPU = file_get_contents('/proc/cpuinfo');
-    preg_match_all('#processor\s+: [0-9]+#', $sCPU, $aMatches);
-    return count($aMatches[0]);
+    if (PHP_OS === "Linux") {
+        $sCPU = file_get_contents('/proc/cpuinfo');
+        preg_match_all('#processor\s+: [0-9]+#', $sCPU, $aMatches);
+        return count($aMatches[0]);
+    }
+    if (PHP_OS === "FreeBSD") {
+        $sCPU = trim(shell_exec('/sbin/sysctl -n hw.ncpu'));
+        return (int)$sCPU;
+    }
 }
 
 
 function getTotalMemoryMB()
 {
-    $sCPU = file_get_contents('/proc/meminfo');
-    preg_match('#MemTotal: +([0-9]+) kB#', $sCPU, $aMatches);
-    return (int)($aMatches[1]/1024);
+    if (PHP_OS === "Linux") {
+        $sMEM = file_get_contents('/proc/meminfo');
+        preg_match('#MemTotal: +([0-9]+) kB#', $sMEM, $aMatches);
+        return (int)($aMatches[1]/1024);
+    }
+    if (PHP_OS === "FreeBSD") {
+        $sMEM = trim(shell_exec('/sbin/sysctl -n hw.physmem'));
+        return (int)($sMEM/(1024*1024));
+    }
 }
 
 
 function getCacheMemoryMB()
 {
-    $sCPU = file_get_contents('/proc/meminfo');
-    preg_match('#Cached: +([0-9]+) kB#', $sCPU, $aMatches);
-    return (int)($aMatches[1]/1024);
+    if (PHP_OS === "Linux") {
+        $sMEM = file_get_contents('/proc/meminfo');
+        preg_match('#Cached: +([0-9]+) kB#', $sMEM, $aMatches);
+        return (int)($aMatches[1]/1024);
+    }
+    if (PHP_OS === "FreeBSD") {
+        # This is based on https://github.com/ocochard/myscripts/blob/master/FreeBSD/freebsd-memory.sh
+        $iPageSize = (int)trim(shell_exec('/sbin/sysctl -n hw.pagesize'));
+        $iCacheCount = (int)trim(shell_exec('/sbin/sysctl -n vm.stats.vm.v_cache_count'));
+        $iInactiveCount = (int)trim(shell_exec('/sbin/sysctl -n vm.stats.vm.v_inactive_count'));
+        $iLaundryCount = (int)trim(shell_exec('/sbin/sysctl -n vm.stats.vm.v_laundry_count'));
+        return (int)($iPageSize * ($iCacheCount + $iInactiveCount + $iLaundryCount) / (1024*1024));
+    }
 }
 
 function getDatabaseDate(&$oDB)
